@@ -1,86 +1,98 @@
-import React, {createContext, useContext, useEffect, useState} from 'react';
-import {Button, FileInput, Label, Modal} from "flowbite-react";
-import {ApiError, endpoint, errorMessage, isError} from "../index";
+import React, {createContext, ReactNode, useContext, useEffect, useRef, useState} from 'react';
+import {Button, FileInput, Label, Modal, TextInput} from "flowbite-react";
+import { endpoint } from "../index";
 import Markdown from "react-markdown";
-import {Portfolio, defaultSection, defaultProject} from "../types/portfolio";
-import {Link} from "react-router-dom";
+import {Portfolio, defaultSection, defaultProject, Project} from "../types/portfolio";
+import { Theme } from '../themes/theme';
+import { HiTrash } from 'react-icons/hi';
+import { MdAddLink } from "react-icons/md";
+import { on } from 'events';
 
-export function PortfolioView({username, editable}: {
-  username?: string,
+// export function PortfolioView({username, editable}: {
+//   username?: string,
+//   editable: boolean,
+// }) {
+//   const [portfolio, setPortfolio] = useState<Portfolio|string|null>(null);
+//   const [saveStatus, setSaveStatus] = useState("");
+
+//   useEffect(() => {
+//     (async () => {
+//       let url = `${endpoint}/api/get_portfolio`;
+//       if (username) {
+//         url += `?username=${encodeURIComponent(username)}`;
+//       }
+
+//       try {
+//         let resp = await fetch(url, {
+//           method: "GET",
+//           headers: {'Content-Type': 'application/json'},
+//           credentials: "include",
+//           mode: "cors"
+//         });
+
+//         if (!resp.ok) {
+//           setPortfolio(await resp.text());
+//           return;
+//         }
+
+//         setPortfolio(await resp.json());
+//       } catch (error) {
+//         console.log(error);
+//       }
+//     })();
+//   }, []);
+
+//   if (portfolio === null) {
+//     return null;
+//   } else if (typeof portfolio === "string") {
+//     return <p>Error: {portfolio}</p>
+//   }
+
+//   const showNavigation = !username;
+
+//   return <div>
+//     {showNavigation && <div className="p-2 grid grid-cols-3 border-b-2 border-black bg-slate-200">
+//       <span className="">
+//         {editable ? saveStatus : "You are viewing the public version of your portfolio."}
+//       </span>
+//       <Link className="mx-auto" to={editable ? "/view" : "/editor"}>
+//         {editable ? "View publically" : "Back to editor"}
+//       </Link>
+//       <a className="ml-auto" href={`${endpoint}/api/logout`}>Logout</a>
+//     </div>}
+//     <PortfolioComponent initialPortfolio={portfolio} editable={editable} setSaveStatus={setSaveStatus} />
+//   </div>;
+// }
+
+type EditorArg = {
+  update: () => void,
   editable: boolean,
-}) {
-  const [portfolio, setPortfolio] = useState<Portfolio|string|null>(null);
-  const [saveStatus, setSaveStatus] = useState("");
-
-  useEffect(() => {
-    (async () => {
-      let url = `${endpoint}/api/get_portfolio`;
-      if (username) {
-        url += `?username=${encodeURIComponent(username)}`;
-      }
-
-      try {
-        let resp = await fetch(url, {
-          method: "GET",
-          headers: {'Content-Type': 'application/json'},
-          credentials: "include",
-          mode: "cors"
-        });
-
-        if (!resp.ok) {
-          setPortfolio(await resp.text());
-          return;
-        }
-
-        setPortfolio(await resp.json());
-      } catch (error) {
-        console.log(error);
-      }
-    })();
-  }, []);
-
-  if (portfolio === null) {
-    return null;
-  } else if (typeof portfolio === "string") {
-    return <p>Error: {portfolio}</p>
-  }
-
-  const showNavigation = !username;
-
-  return <div>
-    {showNavigation && <div className="p-2 grid grid-cols-3 border-b-2 border-black bg-slate-200">
-      <span className="">
-        {editable ? saveStatus : "You are viewing the public version of your portfolio."}
-      </span>
-      <Link className="mx-auto" to={editable ? "/view" : "/editor"}>
-        {editable ? "View publically" : "Back to editor"}
-      </Link>
-      <a className="ml-auto" href={`${endpoint}/api/logout`}>Logout</a>
-    </div>}
-    <PortfolioComponent initialPortfolio={portfolio} editable={editable} setSaveStatus={setSaveStatus} />
-  </div>;
+  setModal: (m: ReactNode|null) => void,
+  theme: Theme,
+  gen: number,
+  incrementGen: () => void,
 }
 
-const EditorContext = createContext<[() => void, boolean]>([() => {}, false]);
+const EditorContext = createContext<EditorArg>(null!);
 
 type ModalArgs = {
   what: string,
   delete: () => void,
 };
 
-export function PortfolioComponent(props: {
+export function PortfolioComponent({initialPortfolio, setPortfolio, editable, setSaveStatus, theme}: {
   initialPortfolio: Portfolio,
+  setPortfolio: (p: Portfolio) => void,
   editable: boolean,
   setSaveStatus: (status: string) => void,
+  theme: Theme,
 }) {
-  const [_portfolio, setPortfolio] = useState(props.initialPortfolio);
-  const portfolio: Portfolio = structuredClone(_portfolio);
+  let portfolio: Portfolio = structuredClone(initialPortfolio);
 
-  const { setSaveStatus } = props;
+  const [modal, setModal] = useState<ReactNode|null>(null);
+  const [gen, setGen] = useState(0);
 
-  const [modal, setModal] = useState<ModalArgs>();
-
-  const updatePortfolio = () => {
+  const update = () => {
     console.log("saving...");
     console.log(portfolio);
     setSaveStatus("Saving...");
@@ -105,100 +117,144 @@ export function PortfolioComponent(props: {
       })
   };
 
-  return <EditorContext.Provider value={[updatePortfolio, props.editable]} >
+  const incrementGen = () => setGen(gen + 1);
+
+  return <EditorContext.Provider value={{update, editable, setModal, theme, gen, incrementGen}} >
     <div>
-      <div className={`flex flex-col sm:flex-row gap-4`}>
-        <div className={`bg-amber-200 p-8 sm:min-h-screen w-screen sm:w-80`}>
-          <EditableField className={"text-3xl font-black w-full "} holder={portfolio} name="firstName"
-                         placeholder={"Your"}/>
-          <EditableField className={"text-3xl font-black mb-6 w-full "} holder={portfolio} name="lastName"
-                         placeholder={"Name"}/>
-          <div className={"inline-flex items-baseline mb-4"}>
-            <img className={"self-center w-5 h-5"} src={"/icons/icons8-location-48.png"}/>
-            <EditableField className={""} holder={portfolio} name="location" placeholder={"Location"}/>
+      <div className={theme.holder}>
+        <div className={theme.sidebar}>
+          <Field
+            className={theme.firstName}
+            holder={portfolio}
+            name="firstName"
+            placeholder="Your"
+          />
+          <Field
+            className={theme.lastName}
+            holder={portfolio}
+            name="lastName"
+            placeholder="Name"
+          />
+          <div className={theme.bioLink.base}>
+            <img className={theme.bioLink.icon} src="/icons/icons8-location-48.png" alt="Location" />
+            <Field
+              className={theme.bioLink.text}
+              holder={portfolio}
+              name="location"
+              placeholder="Location"
+            />
           </div>
-          <div className={"mb-2 pb-2 border-b-2 border-b-amber-800"}>
-            {/* <Link href={"https://github.com/n-milo"}/> */}
-          </div>
-          <EditableMarkdown holder={portfolio} name="bio" placeholder="Bio..." />
+          <div className={theme.sidebarSeparator}></div>
+          <MarkdownParagraph holder={portfolio} name="bio" placeholder="Bio..." />
+          {editable && <a className="text-xs underline" target="_blank" href="https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax">Markdown help</a>}
         </div>
-        <div className={"w-screen h-full p-8 pl-4"}>
-          {
-            portfolio.sections.map((section, i) => <>
-              <div className={"w-full flex flex-row"}>
-                <EditableField holder={section} name="title" className={"mb-4 font-black text-xl flex-grow"}
-                               placeholder={"Section Title..."}/>
-                <DeleteButton array={portfolio.sections} index={i} onClick={d => setModal({
-                  what: "section and all the projects in it",
-                  delete: d,
-                })} />
+        <div className={theme.mainContent}>
+          {portfolio.sections.map((section, i) => (
+            <div key={`${i}-${gen}`}>
+              <div className="w-full flex flex-row">
+                <Field
+                  holder={section}
+                  name="title"
+                  className={theme.section.title}
+                  placeholder="Section Title..."
+                />
+                <DeleteFromArrayButton what="section and all the projects in it" array={portfolio.sections} index={i} />
               </div>
-              <ul className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4 overflow-auto`}>
-                {section.projects.map((project, j) => <li
-                    key={i+","+j}
-                    className={"group text-left bg-gray-100 hover:bg-gray-200 transition rounded-2xl mb-0 pb-0 h-min"}
-                  >
-                    <div className={"rounded-2xl p-4 pb-0 h-min"}>
-                      <div className={"w-full flex flex-row"}>
-                        <EditableField
-                          className="font-extrabold flex-grow min-w-0"
-                          holder={project} name="name"
-                          placeholder={"Project Title..."}
-                        />
-                        <DeleteButton array={section.projects} index={j} onClick={d => setModal({
-                          what: "project",
-                          delete: d
-                        })}/>
-                      </div>
-                      <EditableParagraph
-                        className={"min-h-16 mb-4"}
-                        holder={project} name="description"
-                        placeholder={"Short blurb..."}
-                      />
-                      <UploadableImage
-                        className={"mb-4"}
-                        holder={project}
-                        name="imageURL"
-                        setStatus={setSaveStatus}
-                        setModal={setModal}
-                      />
-                    </div>
-                  </li>
-                )}
-                <li><AddButton array={section.projects} new={defaultProject} className={"min-h-[8.5rem]"}/></li>
+              <ul className={theme.section.list}>
+                {section.projects.map((_, j) => (
+                  <ProjectComponent key={`${i}-${j}-${gen}`} projectKey={`${i}-${j}-${gen}`} array={section.projects} index={j} />
+                ))}
+                <li>
+                  <AddButton
+                    array={section.projects}
+                    new={defaultProject}
+                    className={theme.project.add}
+                  />
+                </li>
               </ul>
-              <hr className={"mb-4"}/>
-            </>)
-          }
-          <AddButton array={portfolio.sections} new={defaultSection} className={"min-h-[4rem]"}/>
+              {(i < portfolio.sections.length-1 || editable) && <hr className={theme.section.separator} />}
+            </div>
+          ))}
+          <AddButton
+            array={portfolio.sections}
+            new={defaultSection}
+            className={theme.section.add}
+          />
         </div>
       </div>
     </div>
-    <Modal show={!!modal} onClose={() => setModal(undefined)} popup>
-      <Modal.Header>Warning</Modal.Header>
-      <Modal.Body>
-        Are you sure you want to delete this {modal?.what}? This cannot be undone.
-      </Modal.Body>
-      <Modal.Footer>
-        <Button color="failure" onClick={() => {
-          modal?.delete();
-          setModal(undefined);
-        }}>Delete</Button>
-        <Button color="gray" onClick={() => setModal(undefined)}>Cancel</Button>
-      </Modal.Footer>
+    <Modal show={!!modal} onClose={() => setModal(null)} popup>
+      {modal}
     </Modal>
   </EditorContext.Provider>;
 }
 
+function DeleteModal({what, onDelete}: {what: string, onDelete: () => void}) {
+  const {setModal} = useContext(EditorContext);
+  return <>
+    <Modal.Header>Warning</Modal.Header>
+    <Modal.Body>
+      Are you sure you want to delete this {what}? This cannot be undone.
+    </Modal.Body>
+    <Modal.Footer>
+      <Button color="failure" onClick={() => {
+        onDelete();
+        setModal(undefined);
+      }}>Delete</Button>
+      <Button color="gray" onClick={() => setModal(undefined)}>Cancel</Button>
+    </Modal.Footer>
+  </>
+}
+
+function ProjectComponent({projectKey, array, index}: {projectKey: string, array: Project[], index: number}) {
+  const project = array[index];
+  const {editable, theme, setModal, gen} = useContext(EditorContext);
+
+  const inner = <>
+    <div className="w-full flex flex-row">
+      <Field
+        className={theme.project.title}
+        holder={project}
+        name="name"
+        placeholder="Project Title..."
+      />
+      <EditLinkButton project={project} />
+      <DeleteFromArrayButton what="project" array={array} index={index} />
+    </div>
+    <UploadableImage
+      projectKey={projectKey}
+      className={"mb-4"}
+      holder={project}
+      name="imageURL"
+    />
+    <Paragraph
+      className={theme.project.description}
+      holder={project}
+      name="description"
+      placeholder="Short blurb..."
+    />
+  </>;
+
+  return <li className={theme.project.item}>
+    {project.link && !editable
+    ? <a className={`${theme.project.content} block`} href={project.link} target="_blank">
+      {inner}
+    </a>
+    : <div className={theme.project.content}>
+      {inner}
+    </div>}
+  </li>
+}
+
 function UploadableImage<T extends string>(props: {
+  projectKey: string,
   holder: { [key in T]?: string },
   name: T,
   className?: string,
   placeholder?: string,
-  setStatus: (status: string) => void,
-  setModal: (modal: ModalArgs) => void,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {update, editable, setModal, theme} = useContext(EditorContext);
+  console.log(props.holder);
 
   const uploadFile = async (f: File) => {
     console.log(f);
@@ -220,35 +276,38 @@ function UploadableImage<T extends string>(props: {
 
       props.holder[props.name] = j.url;
       console.log(props.holder);
+      update();
     } catch (error) {
       alert("Error uploading image: "+error);
       return;
     }
-    update();
   };
 
-  return <div className={"relative flex w-full h-64 items-center justify-center " + props.className}>
+  if (!props.holder[props.name] && !editable) {
+    return null;
+  }
+
+  return <div className={`${theme.uploadableImage.container} ${props.className}`} onClick={e => console.log(e.target)}>
     {props.holder[props.name]
       ? <>
-          <img className="rounded-xl max-w-full max-h-full object-contain" src={props.holder[props.name]} />
+          <img className={theme.uploadableImage.image} src={props.holder[props.name]} />
           <IconButton
-            className="absolute top-3 right-3 z-10 bg-red-500 border-none"
+            className={theme.uploadableImage.deleteButton}
+            icon={HiTrash}
             title="Delete"
-            icon="/icons/icons8-delete-30.png"
-            onClick={() => props.setModal({
-              what: "image",
-              delete: () => {
-                props.holder[props.name] = "";
-                update();
-              }
-            })}
+            onClick={() => setModal(<DeleteModal what="image" onDelete={() => {
+              props.holder[props.name] = "";
+              update();
+            }} />)}
           />
         </>
-      : (editable ? <Dropzone uploadFile={uploadFile} /> : null)}
+      : (editable ? <Dropzone projectKey={props.projectKey} uploadFile={uploadFile} /> : null)}
   </div>
 }
 
-function Dropzone(props: {className?: string, uploadFile: (f: File) => void}) {
+function Dropzone(props: {projectKey: string, className?: string, uploadFile: (f: File) => void}) {
+  const key = props.projectKey;
+  const {theme} = useContext(EditorContext);
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -280,14 +339,11 @@ function Dropzone(props: {className?: string, uploadFile: (f: File) => void}) {
   };
 
   return <Label
-    htmlFor="dropzone-file"
-    className={
-      "flex relative h-64 p-8 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed "
-      + (dragActive
-          ? "bg-blue-200 border-blue-600 cursor-copy "
-          : "bg-gray-50 border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:border-gray-500 dark:hover:bg-gray-600 "
-      )
-    }
+    htmlFor={`dropzone-file-${key}`}
+    className={`
+      ${theme.dropzone.base}
+      ${dragActive ? theme.dropzone.active : theme.dropzone.inactive}
+    `}
     onDragEnter={handleDrag}
     onDragLeave={handleDrag}
     onDragOver={handleDrag}
@@ -295,7 +351,7 @@ function Dropzone(props: {className?: string, uploadFile: (f: File) => void}) {
   >
     <div className="flex flex-col items-center justify-center pb-6 pt-5">
       <svg
-        className="mb-4 h-8 w-8 text-gray-500 dark:text-gray-400"
+        className={theme.dropzone.icon}
         aria-hidden="true"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
@@ -309,40 +365,72 @@ function Dropzone(props: {className?: string, uploadFile: (f: File) => void}) {
           d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
         />
       </svg>
-      <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-        <span className="font-semibold">Click to upload</span> or drag and drop
+      <p className={theme.dropzone.text.main}>
+        <span className={theme.dropzone.text.highlight}>Click to upload</span> or drag and drop
       </p>
-      <p className="text-xs text-gray-500 dark:text-gray-400">PNG or JPEG. Max 2 MB.</p>
+      <p className={theme.dropzone.text.subtext}>PNG or JPEG. Max 2 MB.</p>
     </div>
     <FileInput
-      id="dropzone-file"
+      id={`dropzone-file-${key}`}
       className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
       onChange={handleFileInput}
     />
   </Label>;
 }
 
-function SaveIndicator(props: { text: string }) {
-  return <div
-    className={"absolute left-2 top-2"}
-  >
-    {props.text}
-  </div>
+
+function EditLinkModal({link, setLink}: {link: string, setLink: (l: string) => void}) {
+  const {setModal, update} = useContext(EditorContext);
+  const inputRef = useRef<HTMLInputElement>(null);
+  return <>
+    <Modal.Header>Edit Link</Modal.Header>
+    <Modal.Body>
+      <TextInput ref={inputRef} className="mt-2" defaultValue={link} />
+    </Modal.Body>
+    <Modal.Footer>
+      <Button onClick={() => {
+        if (inputRef.current) {
+          let link = inputRef.current.value;
+          if (!link.startsWith("http"))
+            link = "https://" + link;
+          setLink(link);
+        }
+        setModal(null);
+      }}>Save</Button>
+      <Button color="red" onClick={() => setModal(null)}>Cancel</Button>
+    </Modal.Footer>
+  </>;
 }
 
-function EditableField<T extends string>(props: {
+function EditLinkButton({project}: {project: Project}) {
+  const {setModal, update} = useContext(EditorContext);
+  const onClick = () => {
+    setModal(<EditLinkModal link={project.link || ""} setLink={(l) => {
+      project.link = l;
+      update();
+    }} />);
+  };
+
+  return <IconButton
+    icon={MdAddLink}
+    title="Change link"
+    onClick={onClick}
+  />
+}
+
+function Field<T extends string>(props: {
   holder: { [key in T]: string },
   name: T,
   className?: string,
   placeholder?: string,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {update, editable} = useContext(EditorContext);
   if (!editable) {
-    return <p className={"bg-inherit " + props.className}>{props.holder[props.name] ?? props.placeholder}</p>
+    return <p className={`bg-inherit ${props.className}`}>{props.holder[props.name] ?? props.placeholder}</p>
   }
   return <input
     name={props.name}
-    className={"bg-inherit " + props.className}
+    className={`bg-inherit ${props.className}`}
     placeholder={props.placeholder}
     value={props.holder[props.name]}
     onChange={(v) => {
@@ -352,14 +440,26 @@ function EditableField<T extends string>(props: {
   />
 }
 
-function EditableParagraph<T extends string>(props: {
+function Paragraph<T extends string>(props: {
   holder: { [key in T]: string },
   name: T,
   className?: string,
   placeholder?: string,
-  markdown?: boolean,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {update, editable, theme} = useContext(EditorContext);
+  const textareaRef = useRef<HTMLTextAreaElement|null>(null);
+
+  useEffect(() => {
+    if (editable && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [props.holder[props.name], editable]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    props.holder[props.name] = e.target.value;
+    update();
+  };
 
   if (!editable) {
     return <p className={`bg-inherit ${props.className}`}>
@@ -372,60 +472,71 @@ function EditableParagraph<T extends string>(props: {
     </p>
   }
 
-  return <div className={"max-h-full outline-1 outline-red-400"}>
+  return <div className="outline-1 outline-red-400">
     <textarea
+      ref={textareaRef}
       name={props.name}
-      className={
-        "w-full h-full p-0 bg-inherit border-none resize-none outline-none shadow-none "
-        + (props.markdown ? "font-mono " : "")
-        + props.className
-      }
+      className={`${theme.textarea} ${props.className}`}
       placeholder={props.placeholder}
       value={props.holder[props.name]}
-      onChange={(v) => {
-        props.holder[props.name] = v.target.value;
-        update();
-      }}
+      onChange={handleChange}
     />
   </div>
 }
 
-function EditableMarkdown<T extends string>(props: {
+function MarkdownParagraph<T extends string>(props: {
   holder: { [key in T]: string },
   name: T,
   className?: string,
   placeholder?: string,
 }) {
   const [typing, setTyping] = useState(false);
-  const [update, editable] = useContext(EditorContext);
+  const {update, editable, theme} = useContext(EditorContext);
+  const textareaRef = useRef<HTMLTextAreaElement|null>(null);
+
+  useEffect(() => {
+    if (editable && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [props.holder[props.name], editable, textareaRef]);
+
+  useEffect(() => {
+    if (typing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [typing]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    props.holder[props.name] = e.target.value;
+    update();
+  };
+
   if (!editable) {
-    return <p className={"bg-inherit " + props.className}>{props.holder[props.name]}</p>
+    return <Markdown className="unreset">{props.holder[props.name]}</Markdown>
   }
-  return <div className={"max-h-full outline-1 outline-red-400"}>
+  return <div className="max-h-full outline-1 outline-red-400">
+    <textarea
+      ref={textareaRef}
+      name={props.name}
+      className={`
+        w-full bg-inherit border-none resize-none outline-none shadow-none font-mono text-sm
+        ${props.className}
+        ${!typing && "hidden"}
+      `}
+      placeholder={props.placeholder}
+      value={props.holder[props.name]}
+      onChange={handleChange}
+      onBlur={() => setTyping(false)}
+    />
     {
-      typing
-      ? <textarea
-        name={props.name}
-        className={
-          "w-full p-0 bg-inherit border-none resize-none outline-none shadow-none font-mono text-sm "
-          + props.className
-        }
-        placeholder={props.placeholder}
-        value={props.holder[props.name]}
-        onChange={(v) => {
-          props.holder[props.name] = v.target.value;
-          update();
-        }}
-        onBlur={() => setTyping(false)}
-        autoFocus
-      />
-      : <div
-          className={"h-screen cursor-text "}
-          onClick={() => {
-            setTyping(true);
-          }}
+      !typing && <div
+          className={theme.markdownPreview.container}
+          onClick={() => setTyping(true)}
         >
-          <Markdown className="unreset">
+          <Markdown className={"unreset " + (props.holder[props.name] === "" ? theme.markdownPreview.placeholder : "")}>
             {props.holder[props.name] === "" ? "Bio..." : props.holder[props.name]}
           </Markdown>
         </div>
@@ -439,28 +550,29 @@ function AddButton<T>(props: {
   className?: string,
   placeholder?: string,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {update, editable, theme, incrementGen} = useContext(EditorContext);
 
   if (!editable) {
     return null;
   }
 
   return <button
-    className={"border-4 hover:border-blue-200 border-dashed rounded-2xl w-full text-3xl font-extralight p-0 m-0 " + props.className}
+    className={`${theme.addButton} ${props.className}`}
     onClick={() => {
       props.array.push(props.new);
+      incrementGen();
       update();
     }}
   >{props.placeholder ?? "+"}</button>
 }
 
-function DeleteButton<T>(props: {
+function DeleteFromArrayButton<T>(props: {
   array: T[],
-  onClick: (del: () => void) => void,
   index: number,
+  what: string,
   className?: string,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {editable, update, incrementGen, setModal} = useContext(EditorContext);
 
   if (!editable) {
     return null;
@@ -469,26 +581,48 @@ function DeleteButton<T>(props: {
   return <IconButton
     className={props.className}
     title="Delete"
-    icon="/icons/icons8-delete-30.png"
-    onClick={() => props.onClick(() => {
+    icon={HiTrash}
+    onClick={() => setModal(<DeleteModal what={props.what} onDelete={() => {
       props.array.splice(props.index, 1);
+      incrementGen();
       update();
-    })}
+    }} />)}
+  />
+}
+
+function DeleteButton<T>(props: {
+  onClick: () => void,
+  className?: string,
+}) {
+  const {editable, setModal, update, incrementGen} = useContext(EditorContext);
+
+  if (!editable) {
+    return null;
+  }
+
+  return <IconButton
+    className={props.className}
+    title="Delete"
+    icon={HiTrash}
+    onClick={props.onClick}
   />
 }
 
 function IconButton<T>(props: {
-  icon: string,
+  icon: React.ComponentType<{className?: string}>,
   title: string,
   className?: string,
   onClick?: () => void,
 }) {
-  const [update, editable] = useContext(EditorContext);
+  const {theme, editable} = useContext(EditorContext);
+  if (!editable) {
+    return null;
+  }
   return <button
     title={props.title}
-    className={"group/button rounded-lg p-1 max-h-7 border-2 border-black hover:bg-red-500 hover:border-white transition " + props.className}
+    className={`${theme.iconButton.base} ${props.className}`}
     onClick={props.onClick}
   >
-    <img className={"min-w-4 w-4 h-4 max-h-4 group-hover/button:invert transition-all"} src={props.icon} />
+    <props.icon className={theme.iconButton.icon} />
   </button>;
 }

@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"net/http"
@@ -20,7 +23,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/mattn/go-sqlite3"
+	"github.com/nfnt/resize"
+	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -67,6 +73,7 @@ type Project struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	ImageURL    string `json:"imageURL,omitempty"`
+	Link        string `json:"link,omitempty"`
 }
 
 var defaultPortfolio = Portfolio{
@@ -77,7 +84,7 @@ var db *sql.DB
 var sessionManager *scs.SessionManager
 var s3svc *s3.S3
 
-const frontend = "http://localhost:3000"
+var frontend string
 
 var (
 	googleOauthConfig *oauth2.Config
@@ -242,7 +249,7 @@ func getLoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-var reservedNames = CreateSet[string]("", "api", "auth", "signup", "login", "editor")
+var reservedNames = CreateSet[string]("", "api", "auth", "signup", "login", "editor", "p", "blog")
 
 func isUsernameAvailable(name string) (bool, error) {
 	if len(name) < 2 || len(name) > 16 {
@@ -317,21 +324,34 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := s3svc.PutObject(&s3.PutObjectInput{
-		Bucket:               aws.String("foliopage-images"),
-		Key:                  aws.String(filename),
-		Body:                 bytes.NewReader(buf.Bytes()),
-		ContentType:          aws.String(ctype),
-		ContentDisposition:   aws.String("attachment"),
-		ServerSideEncryption: aws.String("AES256"),
-	}); err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+	// url, err := saveImageToS3(buf.Bytes(), filename, ctype)
+	// if err != nil {
+	// 	http.Error(w, "internal server error", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// go func() {
+	resized, err := resizeImage(buf.Bytes(), ext)
+	if err != nil {
+		log.Printf("error resizing image: %v\n", err)
 		return
 	}
 
-	url := fmt.Sprintf("https://foliopage-images.s3.amazonaws.com/%s", filename)
+	resizedUrl, err := saveImageToS3(resized, filename, ctype)
+	if err != nil {
+		log.Printf("error saving resized image to s3: %v\n", err)
+	}
 
-	fmt.Printf("uploaded image with id %s\n", filename)
+	url := resizedUrl
+
+	// if resizedUrl != url {
+	// 	log.Printf("warning: resized url does not match old (%s != %s)", resizedUrl, url)
+	// }
+
+	log.Printf("uploaded resized image %s\n", resizedUrl)
+	// }()
+
+	log.Printf("uploaded image with id %s\n", filename)
 	resp := struct {
 		URL string `json:"url"`
 	}{
@@ -340,6 +360,86 @@ func uploadImageHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(Must(json.Marshal(resp)))
+}
+
+const imageResizeHeight = 512
+const imageJpegQuality = 100
+
+func resizeImage(imgData []byte, ext string) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(imgData))
+	if err != nil {
+		return nil, err
+	}
+
+	var exifData *exif.Exif
+	if ext == "jpg" {
+		exifData, err = exif.Decode(bytes.NewReader(imgData))
+		if err != nil {
+			exifData = nil
+		}
+	}
+
+	resized := resize.Resize(0, imageResizeHeight, img, resize.Lanczos3)
+
+	var buf bytes.Buffer
+
+	switch ext {
+	case "jpg":
+		err = encodeJPEG(&buf, resized, exifData)
+	case "png":
+		err = png.Encode(&buf, resized)
+	default:
+		return nil, fmt.Errorf("unsupported image extension .%s", ext)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func encodeJPEG(w *bytes.Buffer, m image.Image, exifData *exif.Exif) error {
+	opts := jpeg.Options{
+		Quality: imageJpegQuality,
+	}
+
+	var tmp bytes.Buffer
+	if err := jpeg.Encode(&tmp, m, &opts); err != nil {
+		return err
+	}
+
+	if exifData == nil {
+		io.Copy(w, &tmp)
+		return nil
+	}
+
+	w.Write(tmp.Bytes()[:2]) // JPEG header
+
+	// EXIF data
+	w.Write([]byte{0xFF, 0xE1})
+	exifLength := uint16(len(exifData.Raw) + 2)
+	w.Write([]byte{uint8(exifLength >> 8), uint8(exifLength & 0xFF)})
+	w.Write(exifData.Raw)
+
+	// rest of jpeg
+	w.Write(tmp.Bytes()[2:])
+	return nil
+}
+
+func saveImageToS3(imgData []byte, filename, contentType string) (string, error) {
+	if _, err := s3svc.PutObject(&s3.PutObjectInput{
+		Bucket:               aws.String("foliopage-images"),
+		Key:                  aws.String(filename),
+		Body:                 bytes.NewReader(imgData),
+		ContentType:          aws.String(contentType),
+		ContentDisposition:   aws.String("attachment"),
+		ServerSideEncryption: aws.String("AES256"),
+	}); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://foliopage-images.s3.amazonaws.com/%s", filename), nil
 }
 
 func handleGoogleSignup(w http.ResponseWriter, r *http.Request) {
@@ -456,7 +556,7 @@ func handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if !emailExists && !loginFlow {
 		// create new user in database (case 2)
 		username := stateParts[1]
-		fmt.Printf("welcome %s\n", username)
+		log.Printf("creating new user %s (%s)\n", username, userInfo.Email)
 		portfolio := Must(json.Marshal(defaultPortfolio))
 		now := time.Now().Format(time.RFC3339)
 		id := uuid.New()
@@ -521,12 +621,15 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	Require(os.Setenv("AWS_SDK_LOAD_CONFIG", "true"))
+	Require(godotenv.Load())
+
+	frontend = os.Getenv("FRONTEND_HOST")
+	backend := os.Getenv("SERVER_HOST")
 
 	awsSession := session.Must(session.NewSession())
 	s3svc = s3.New(awsSession)
 
-	db = Must(sql.Open("sqlite3", "./db.db"))
+	db = Must(sql.Open("sqlite3", os.Getenv("DATABASE_LOCATION")))
 
 	Must(db.Exec(`
 		CREATE TABLE IF NOT EXISTS sessions (
@@ -552,9 +655,9 @@ func main() {
 	`))
 
 	googleOauthConfig = &oauth2.Config{
-		RedirectURL:  "http://localhost:8000/auth/google/callback",
-		ClientID:     "952830827851-6dgglpdtc3oohpm5qlr3f2o4v3p6juh3.apps.googleusercontent.com",
-		ClientSecret: "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",
+		RedirectURL:  backend + "/auth/google/callback",
+		ClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 		},

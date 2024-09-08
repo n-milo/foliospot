@@ -15,6 +15,7 @@ export type Section = {
 export type Project = {
   name: string,
   description: string,
+  link?: string,
   imageURL?: string,
 };
 
