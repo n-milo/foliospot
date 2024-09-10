@@ -1,13 +1,23 @@
+import { Portfolio } from "../types/portfolio";
 
 export type Theme = any;
 
-export const defaultTheme = (sidebarColor: string, backgroundColor: string, projectColor: string, accentColor: string) => {
+export const defaultTheme = (portfolio: Portfolio) => {
+  const {
+    sidebarColor,
+    backgroundColor,
+    projectColor,
+    accentColor,
+    font
+  } = portfolio;
+
+  // sidebarColor: string, backgroundColor: string, projectColor: string, accentColor: string
   const sidebarDark = +sidebarColor.split("-")[1] > 500;
   const mainDark = +backgroundColor.split("-")[1] > 500;
   const projectDark = +projectColor.split("-")[1] > 500;
 
   return {
-    holder: `flex flex-col sm:flex-row gap-4 bg-${backgroundColor} ${mainDark ? "text-white" : "text-black"}`,
+    holder: `flex flex-col sm:flex-row gap-4 font-${font} bg-${backgroundColor} ${mainDark ? "text-white" : "text-black"}`,
     sidebar: `bg-${sidebarColor} p-8 sm:min-h-screen w-screen sm:w-80 ${sidebarDark ? "text-white" : "text-black"}`,
     firstName: "text-3xl font-black w-full",
     lastName: "text-3xl font-black mb-6 w-full",
@@ -59,7 +69,7 @@ export const defaultTheme = (sidebarColor: string, backgroundColor: string, proj
     addButton: "border-4 hover:border-blue-200 border-dashed rounded-2xl w-full text-3xl font-extralight p-0 m-0",
     iconButton: {
       base: `group/button rounded-lg p-1 max-h-7 border-2 ${projectDark ? "border-white" : "border-black"} hover:bg-red-500 hover:border-white transition`,
-      icon: `min-w-4 w-4 h-4 max-h-4 group-hover/button:invert transition-all ${projectDark ? "invert" : ""}`
+      icon: `min-w-4 w-4 h-4 max-h-4 group-hover/button:invert transition-all`
     },
     markdownPreview: {
       container: "min-h-16 cursor-text hover:outline-2 outline-black hover:outline-dashed",

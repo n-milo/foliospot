@@ -62,6 +62,12 @@ type Portfolio struct {
 	Location  string    `json:"location"`
 	Bio       string    `json:"bio"`
 	Sections  []Section `json:"sections"`
+
+	SidebarColor    string `json:"sidebarColor"`
+	BackgroundColor string `json:"backgroundColor"`
+	ProjectColor    string `json:"projectColor"`
+	AccentColor     string `json:"accentColor"`
+	Font            string `json:"font"`
 }
 
 type Section struct {
@@ -77,7 +83,12 @@ type Project struct {
 }
 
 var defaultPortfolio = Portfolio{
-	Sections: make([]Section, 0),
+	Sections:        make([]Section, 0),
+	SidebarColor:    "amber-400",
+	BackgroundColor: "slate-50",
+	ProjectColor:    "slate-100",
+	AccentColor:     "slate-200",
+	Font:            "sans",
 }
 
 var db *sql.DB

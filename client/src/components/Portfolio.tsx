@@ -3,10 +3,11 @@ import {Button, FileInput, Label, Modal, TextInput} from "flowbite-react";
 import { endpoint } from "../index";
 import Markdown from "react-markdown";
 import {Portfolio, defaultSection, defaultProject, Project} from "../types/portfolio";
-import { Theme } from '../themes/theme';
+import { defaultTheme, Theme } from '../themes/theme';
 import { HiTrash } from 'react-icons/hi';
 import { MdAddLink } from "react-icons/md";
 import { on } from 'events';
+import { SaveStatus } from '../routes/editor';
 
 // export function PortfolioView({username, editable}: {
 //   username?: string,
@@ -80,41 +81,44 @@ type ModalArgs = {
   delete: () => void,
 };
 
-export function PortfolioComponent({initialPortfolio, setPortfolio, editable, setSaveStatus, theme}: {
+export function PortfolioComponent({initialPortfolio, setPortfolio}: {
   initialPortfolio: Portfolio,
-  setPortfolio: (p: Portfolio) => void,
-  editable: boolean,
-  setSaveStatus: (status: string) => void,
-  theme: Theme,
+  setPortfolio: ((p: Portfolio) => void)|null,
 }) {
   let portfolio: Portfolio = structuredClone(initialPortfolio);
+  const theme = defaultTheme(portfolio);
+  const editable = setPortfolio !== null;
 
   const [modal, setModal] = useState<ReactNode|null>(null);
   const [gen, setGen] = useState(0);
 
+  // const update = () => {
+  //   console.log("saving...");
+  //   console.log(portfolio);
+  //   setSaveStatus("Saving...");
+  //   setPortfolio(portfolio);
+  //   fetch(`${endpoint}/api/put_portfolio`, {
+  //     method: "POST",
+  //     headers: {'Content-Type': 'application/json'},
+  //     body: JSON.stringify(portfolio),
+  //     credentials: "include",
+  //     mode: "cors"
+  //   })
+  //     .then(r => {
+  //       if (r.status === 200) {
+  //         setSaveStatus("Saved!");
+  //       } else {
+  //         setSaveStatus(`Failed to save: ${r.status} ${r.statusText}`);
+  //       }
+  //     })
+  //     .catch(e => {
+  //       console.error(e);
+  //       setSaveStatus(`Failed to send save request`);
+  //     })
+  // };
+
   const update = () => {
-    console.log("saving...");
-    console.log(portfolio);
-    setSaveStatus("Saving...");
-    setPortfolio(portfolio);
-    fetch(`${endpoint}/api/put_portfolio`, {
-      method: "POST",
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(portfolio),
-      credentials: "include",
-      mode: "cors"
-    })
-      .then(r => {
-        if (r.status === 200) {
-          setSaveStatus("Saved!");
-        } else {
-          setSaveStatus(`Failed to save: ${r.status} ${r.statusText}`);
-        }
-      })
-      .catch(e => {
-        console.error(e);
-        setSaveStatus(`Failed to send save request`);
-      })
+    setPortfolio!(portfolio);
   };
 
   const incrementGen = () => setGen(gen + 1);
@@ -254,7 +258,6 @@ function UploadableImage<T extends string>(props: {
   placeholder?: string,
 }) {
   const {update, editable, setModal, theme} = useContext(EditorContext);
-  console.log(props.holder);
 
   const uploadFile = async (f: File) => {
     console.log(f);
@@ -587,24 +590,6 @@ function DeleteFromArrayButton<T>(props: {
       incrementGen();
       update();
     }} />)}
-  />
-}
-
-function DeleteButton<T>(props: {
-  onClick: () => void,
-  className?: string,
-}) {
-  const {editable, setModal, update, incrementGen} = useContext(EditorContext);
-
-  if (!editable) {
-    return null;
-  }
-
-  return <IconButton
-    className={props.className}
-    title="Delete"
-    icon={HiTrash}
-    onClick={props.onClick}
   />
 }
 

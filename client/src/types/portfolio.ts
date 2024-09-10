@@ -1,3 +1,4 @@
+export type Font = "sans" | "serif" | "mono";
 
 export type Portfolio = {
   firstName: string,
@@ -5,6 +6,11 @@ export type Portfolio = {
   location: string,
   bio: string,
   sections: Section[],
+  sidebarColor: string,
+  backgroundColor: string,
+  projectColor: string,
+  accentColor: string,
+  font: Font,
 };
 
 export type Section = {
@@ -26,7 +32,3 @@ export const defaultProject: Project = {
 export const defaultSection: Section = {
   projects: [defaultProject], title: ""
 };
-
-export const defaultPortfolio: Portfolio = {
-  bio: "", location: "", firstName: "", lastName: "", sections: [defaultSection]
-}
