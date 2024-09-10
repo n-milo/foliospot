@@ -4,7 +4,7 @@ import { endpoint } from "../index";
 import Markdown from "react-markdown";
 import {Portfolio, defaultSection, defaultProject, Project} from "../types/portfolio";
 import { defaultTheme, Theme } from '../themes/theme';
-import { HiTrash } from 'react-icons/hi';
+import { HiLocationMarker, HiTrash } from 'react-icons/hi';
 import { MdAddLink } from "react-icons/md";
 import { on } from 'events';
 import { SaveStatus } from '../routes/editor';
@@ -92,31 +92,6 @@ export function PortfolioComponent({initialPortfolio, setPortfolio}: {
   const [modal, setModal] = useState<ReactNode|null>(null);
   const [gen, setGen] = useState(0);
 
-  // const update = () => {
-  //   console.log("saving...");
-  //   console.log(portfolio);
-  //   setSaveStatus("Saving...");
-  //   setPortfolio(portfolio);
-  //   fetch(`${endpoint}/api/put_portfolio`, {
-  //     method: "POST",
-  //     headers: {'Content-Type': 'application/json'},
-  //     body: JSON.stringify(portfolio),
-  //     credentials: "include",
-  //     mode: "cors"
-  //   })
-  //     .then(r => {
-  //       if (r.status === 200) {
-  //         setSaveStatus("Saved!");
-  //       } else {
-  //         setSaveStatus(`Failed to save: ${r.status} ${r.statusText}`);
-  //       }
-  //     })
-  //     .catch(e => {
-  //       console.error(e);
-  //       setSaveStatus(`Failed to send save request`);
-  //     })
-  // };
-
   const update = () => {
     setPortfolio!(portfolio);
   };
@@ -140,7 +115,7 @@ export function PortfolioComponent({initialPortfolio, setPortfolio}: {
             placeholder="Name"
           />
           <div className={theme.bioLink.base}>
-            <img className={theme.bioLink.icon} src="/icons/icons8-location-48.png" alt="Location" />
+            <HiLocationMarker className={theme.bioLink.icon} />
             <Field
               className={theme.bioLink.text}
               holder={portfolio}

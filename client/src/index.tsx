@@ -5,6 +5,7 @@ import {createBrowserRouter, RouterProvider, useParams} from "react-router-dom";
 import {Signup} from "./routes/signup";
 import { Landing } from './routes/landing';
 import { Editor } from './routes/editor';
+import { Userpage } from './routes/userpage';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -42,12 +43,6 @@ export async function checkLoginStatus() {
   }
 
   return false;
-}
-
-function Userpage() {
-  const {userid} = useParams();
-  return <div></div>;
-  // return <PortfolioView username={userid} editable={false} />;
 }
 
 const router = createBrowserRouter([

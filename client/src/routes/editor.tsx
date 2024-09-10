@@ -67,13 +67,6 @@ export function Editor() {
 
   const statusMessage = (s: SaveStatus) => ('info' in s) ? s.info : s.error;
 
-  const [editable, setEditable] = useState(true);
-
-  const [sidebarColor, setSidebarColor] = useState("");
-  const [backgroundColor, setBackgroundColor] = useState("");
-  const [projectColor, setProjectColor] = useState("");
-  const [accentColor, setAccentColor] = useState("");
-
   useEffect(() => {
     (async () => {
       let url = `${endpoint}/api/get_portfolio`;
@@ -154,7 +147,7 @@ export function Editor() {
     <Tabs.Item title="Logout" onClick={() => window.location.href = `${endpoint}/api/logout`}>
     </Tabs.Item>
   </Tabs>
-  {saveStatus !== null && <Toast className="sticky left-4 bottom-4">
+  {saveStatus !== null && <Toast className="fixed left-4 bottom-4">
     <div>
       {'info' in saveStatus &&
         <HiInformationCircle className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-cyan-100 bg-cyan-500" />}

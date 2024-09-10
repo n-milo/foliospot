@@ -23,7 +23,7 @@ export const defaultTheme = (portfolio: Portfolio) => {
     lastName: "text-3xl font-black mb-6 w-full",
     bioLink: {
       base: "inline-flex items-baseline mb-4",
-      icon: "self-center w-5 h-5",
+      icon: "self-center w-5 h-5 mr-2",
       text: "",
     },
     sidebarSeparator: `mb-2 pb-2 border-b-2 ${sidebarDark ? "border-white" : "border-black"}`,
