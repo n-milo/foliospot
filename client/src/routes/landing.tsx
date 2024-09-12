@@ -83,7 +83,6 @@ return (
 
       <div className="text-center mb-16">
         <h3 className="text-2xl font-semibold text-gray-800 mb-4">Join thousands of professionals showcasing their work</h3>
-        <img className="w-full max-w-4xl mx-auto rounded-lg shadow-lg" src="/demo-screenshot.png" alt="Portfolio Demo" />
       </div>
 
       <footer className="text-center text-gray-600">

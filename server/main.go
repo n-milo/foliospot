@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	"github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/nfnt/resize"
 	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/oauth2"
@@ -586,15 +586,7 @@ func handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 			portfolio,
 			now,
 		); err != nil {
-			if sqliteErr, ok := err.(sqlite3.Error); ok {
-				if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
-					// username got taken by someone else
-					http.Redirect(w, r, frontend+"/signup?error=true", http.StatusTemporaryRedirect)
-					return
-				}
-			}
-
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Redirect(w, r, frontend+"/signup?error=true", http.StatusTemporaryRedirect)
 			return
 		}
 	}

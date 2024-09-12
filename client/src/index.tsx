@@ -11,7 +11,7 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-export const endpoint = "http://localhost:8000";
+export const endpoint = process.env.REACT_APP_API_ENDPOINT;
 
 export interface ApiError {
   errorMessage: string,

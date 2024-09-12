@@ -27,15 +27,23 @@ export function Signup() {
   const checkUsername = async (username: string) => {
     const currentRequestID = ++lastRequestID.current;
 
-    const resp = await fetch(`${endpoint}/api/check_username?username=${username}`);
-    if (!resp.ok) {
-      const text = await resp.text();
-      setHelper(`Error: ${text}`);
+    let available: boolean;
+
+    try {
+      const resp = await fetch(`${endpoint}/api/check_username?username=${username}`);
+      if (!resp.ok) {
+        const text = await resp.text();
+        setHelper(`Error: ${text}`);
+        setStatus(FormStatus.Bad);
+        return;
+      }
+
+      available = await resp.json();
+    } catch (error) {
+      setHelper(`Error: ${error}`);
       setStatus(FormStatus.Bad);
       return;
     }
-
-    const available = await resp.json();
 
     if (currentRequestID == lastRequestID.current) {
       if (available) {
